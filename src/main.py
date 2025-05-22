@@ -8,6 +8,10 @@ if __name__ == '__main__':
     #fill the board with numbers
     board = SudokuBoard()
 
+    board.set_cell_value(0,0, 9)
+    board.set_cell_value(8,8, 9)
+    board.set_cell_note(0,0, 5)
+
     gui = SudokuGUI(board)
     board = gui.run()
 
