@@ -111,22 +111,9 @@ class SudokuGUI:
 
     def refresh_gui(self):
         """
-        Synchronizes the GUI with the current state of the Sudoku board.
-
-        Logic:
-        - Iterates over all 9x9 cells in the board.
-        - For each cell:
-            - Determines its parent subgrid frame based on its position.
-            - Removes any existing widgets (Entry or note labels) from the cell's location in the GUI.
-            - If the cell has a value:
-                - Creates a new Entry widget, inserts the value, and places it in the correct position.
-                - Updates the internal reference to the Entry widget.
-            - If the cell does not have a value:
-                - Creates a new Frame to hold a 3x3 grid of note labels.
-                - For each possible note (1-9), creates a Label widget displaying the note if present.
-                - Arranges the labels in a 3x3 grid within the cell's frame.
-                - Updates the internal references to the note label widgets.
-        - Ensures the GUI always reflects the current state of the board, including both values and notes.
+        Efficiently synchronizes the GUI with the current state of the Sudoku board.
+        Only updates or recreates widgets if the cell type (value/notes) has changed.
+        Ensures that self.entries and self.notes are mutually exclusive for each cell.
         """
         for i in range(9):
             for j in range(9):
@@ -134,34 +121,60 @@ class SudokuGUI:
                 cell_value = cell.get_value()
                 subgrid_row, subgrid_col = i // 3, j // 3
                 parent_frame = self.root.grid_slaves(row=subgrid_row, column=subgrid_col)[0]
-                cell_widgets = parent_frame.grid_slaves(row=i % 3, column=j % 3)
-                # Remove all widgets in the cell
-                for widget in cell_widgets:
-                    widget.destroy()
+
                 if cell_value:
-                    # Create Entry widget
-                    e = tk.Entry(parent_frame, width=4, font=('Arial', 18), justify='center',
-                                 validate="key", validatecommand=(self.root.register(self.validate_input), "%P"))
-                    e.grid(row=i % 3, column=j % 3, padx=1, pady=1, sticky="nsew")
-                    e.insert(0, str(cell_value))
-                    self.entries[i][j] = e
-                    self.notes[i][j] = [[None for _ in range(3)] for _ in range(3)]
+                    # If Entry already exists, just update its value
+                    if self.entries[i][j] is not None:
+                        entry = self.entries[i][j]
+                        current_val = entry.get()
+                        if current_val != str(cell_value):
+                            entry.delete(0, tk.END)
+                            entry.insert(0, str(cell_value))
+                    else:
+                        # Remove note widgets if present
+                        if self.notes[i][j] is not None:
+                            for ni in range(3):
+                                for nj in range(3):
+                                    note_label = self.notes[i][j][ni][nj]
+                                    if note_label is not None:
+                                        note_label.master.destroy()
+                            self.notes[i][j] = None
+                        # Create Entry widget
+                        e = tk.Entry(parent_frame, width=4, font=('Arial', 18), justify='center',
+                                     validate="key", validatecommand=(self.root.register(self.validate_input), "%P"))
+                        e.grid(row=i % 3, column=j % 3, padx=1, pady=1, sticky="nsew")
+                        e.insert(0, str(cell_value))
+                        self.entries[i][j] = e
+                    # Always nullify notes if Entry exists
+                    self.notes[i][j] = None
                 else:
-                    # Create 3x3 grid of labels for notes
-                    frame = tk.Frame(parent_frame, width=40, height=40, bd=1, relief="solid")
-                    frame.grid(row=i % 3, column=j % 3, padx=1, pady=1, sticky="nsew")
+                    # If notes grid already exists, just update note labels
+                    if self.entries[i][j] is not None:
+                        self.entries[i][j].destroy()
+                        self.entries[i][j] = None
+                    if self.notes[i][j] is not None:
+                        for ni in range(3):
+                            for nj in range(3):
+                                note_label = self.notes[i][j][ni][nj]
+                                note_val = cell.get_note(ni, nj)
+                                note_label.config(text=str(note_val) if note_val else "")
+                    else:
+                        # Create 3x3 grid of labels for notes
+                        frame = tk.Frame(parent_frame, width=40, height=40, bd=1, relief="solid")
+                        frame.grid(row=i % 3, column=j % 3, padx=1, pady=1, sticky="nsew")
+                        self.notes[i][j] = [[None for _ in range(3)] for _ in range(3)]
+                        for ni in range(3):
+                            for nj in range(3):
+                                note_val = cell.get_note(ni, nj)
+                                note = tk.Label(frame, text=str(note_val) if note_val else "", font=('Arial', 6),
+                                                width=2, height=1)
+                                note.grid(row=ni, column=nj, sticky="nsew")
+                                self.notes[i][j][ni][nj] = note
+                        for ni in range(3):
+                            frame.grid_rowconfigure(ni, weight=1)
+                            frame.grid_columnconfigure(ni, weight=1)
+                    # Always nullify entry if notes exist
                     self.entries[i][j] = None
-                    self.notes[i][j] = [[None for _ in range(3)] for _ in range(3)]
-                    for ni in range(3):
-                        for nj in range(3):
-                            note_val = cell.get_note(ni, nj)
-                            note = tk.Label(frame, text=str(note_val) if note_val else "", font=('Arial', 6), width=2,
-                                            height=1)
-                            note.grid(row=ni, column=nj, sticky="nsew")
-                            self.notes[i][j][ni][nj] = note
-                    for ni in range(3):
-                        frame.grid_rowconfigure(ni, weight=1)
-                        frame.grid_columnconfigure(ni, weight=1)
 
     # noinspection PyMethodMayBeStatic
     def validate_input(self, value: str) -> bool:
