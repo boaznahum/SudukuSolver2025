@@ -2,6 +2,8 @@ import tkinter as tk
 
 from data.Cell import Cell
 from data.SudokuBoard import SudokuBoard
+from solver import Solver
+
 
 class SudokuGUI:
     """
@@ -24,6 +26,8 @@ class SudokuGUI:
         self.notes: list[list[list[list[tk.Label | None]] | None]] = [
             [[[None for _ in range(3)] for _ in range(3)] for _ in range(9)] for _ in range(9)
         ]
+
+        self._solver = Solver(board)
         self.create_widgets()
 
 
@@ -189,8 +193,7 @@ class SudokuGUI:
         self.refresh_model()
         # Call your solve function here, e.g. solve_sudoku(board)
         from solver.Solver import Solver  # adjust import as needed
-        solver = Solver()
-        solver.solve(self.board)
+        self._solver.solve()
         # Refresh GUI with solution
         self.refresh_gui()
 
