@@ -4,12 +4,24 @@ from data.Cell import Cell
 from data.SudokuBoard import SudokuBoard
 
 class SudokuGUI:
+    """
+    A graphical user interface (GUI) for displaying and editing a Sudoku board.
+
+    Structure:
+    - The main window displays a 9x9 Sudoku board, organized as a 3x3 grid of larger subgrids (big boards).
+    - Each big board (subgrid) is itself a 3x3 grid of cells.
+    - Each cell can either:
+        - Contain a value (1-9), shown as a large Entry widget for user input.
+        - If the cell has no value, it displays a smaller 3x3 grid of labels, each representing a possible note (1-9).
+    - The GUI allows users to input values or notes, and provides buttons for solving the puzzle or confirming input.
+    - The class maintains references to all Entry widgets and note label widgets for synchronizing the GUI with the underlying Sudoku board model.
+    """
     def __init__(self, board: SudokuBoard):
         self.board = board
         self.root = tk.Tk()
         self.root.title("Sudoku Board Input")
         self.entries: list[list[tk.Entry | None]] = [[None for _ in range(9)] for _ in range(9)]
-        self.notes: list[list[list[list[tk.Label | None]]]] = [
+        self.notes: list[list[list[list[tk.Label | None]] | None]] = [
             [[[None for _ in range(3)] for _ in range(3)] for _ in range(9)] for _ in range(9)
         ]
         self.create_widgets()
@@ -17,16 +29,42 @@ class SudokuGUI:
 
     def create_widgets(self):
         """
-        For cell in board create a:
-            - Entry if the cell has a value display the value in an Entry widget
-            - otherwise display all the notes in a 3x3 grid of labels
+        Initializes and arranges all widgets for the Sudoku board GUI.
 
-        :return:
+        Description:
+        - Constructs the visual 9x9 Sudoku board as a 3x3 grid of subgrid frames (big boards), each containing a 3x3 grid of cells.
+        - For each cell:
+            - If the cell has a value, creates a single Entry widget for user input, displays the value, and stores a reference in self.entries.
+            - If the cell is empty, creates a 3x3 grid of Label widgets (for notes) inside a Frame, and stores references in self.notes.
+        - Adds "Solve" and "OK" buttons at the bottom of the board.
+
+        Class Field Relations:
+        - self.entries: 9x9 list of Entry widgets or None. Each [i][j] holds the Entry for cell (i, j) if it has a value, else None.
+        - self.notes: 9x9x3x3 list of Label widgets or None.
+        - For empty cells, self.notes[i][j][ni][nj] holds the Label for note (ni, nj) in cell (i, j); for value cells, self.notes[i][j] is None.
+        - subgrid_frames: Local 3x3 list of Frame widgets, each representing a 3x3 subgrid in the main board.
+
+        Logic:
+        1. Registers input validation for Entry widgets.
+        2. Creates a 3x3 grid of subgrid frames and arranges them in the main window.
+        3. Iterates over all 81 cells:
+            a. Determines the subgrid for each cell.
+            b. If the cell has a value:
+                - Creates an Entry widget, inserts the value, and places it in the correct subgrid.
+                - Updates self.entries[i][j] with the Entry; sets self.notes[i][j] to None.
+            c. If the cell is empty:
+                - Creates a Frame for the cell, then a 3x3 grid of Label widgets for notes.
+                - Each Label displays a note if present.
+                - Updates self.notes[i][j][ni][nj] with each Label; sets self.entries[i][j] to None.
+        4. Adds "Solve" and "OK" buttons below the board.
+
+        This method ensures the GUI structure matches the logical board, and that all widgets are accessible for later updates or synchronization.
         """
+
         validate_cmd = self.root.register(self.validate_input)
 
-        # Create 3x3 grid of frames for subgrids
-        subgrid_frames = [[None for _ in range(3)] for _ in range(3)]
+        # Create 3x3 grid of frames for sub grids
+        subgrid_frames: list[list[tk.Frame | None]] = [[None for _ in range(3)] for _ in range(3)]
 
         for y in range(3):
             for x in range(3):
@@ -72,6 +110,24 @@ class SudokuGUI:
         ok_button.grid(row=9, column=5, columnspan=4, pady=10, sticky="e")
 
     def refresh_gui(self):
+        """
+        Synchronizes the GUI with the current state of the Sudoku board.
+
+        Logic:
+        - Iterates over all 9x9 cells in the board.
+        - For each cell:
+            - Determines its parent subgrid frame based on its position.
+            - Removes any existing widgets (Entry or note labels) from the cell's location in the GUI.
+            - If the cell has a value:
+                - Creates a new Entry widget, inserts the value, and places it in the correct position.
+                - Updates the internal reference to the Entry widget.
+            - If the cell does not have a value:
+                - Creates a new Frame to hold a 3x3 grid of note labels.
+                - For each possible note (1-9), creates a Label widget displaying the note if present.
+                - Arranges the labels in a 3x3 grid within the cell's frame.
+                - Updates the internal references to the note label widgets.
+        - Ensures the GUI always reflects the current state of the board, including both values and notes.
+        """
         for i in range(9):
             for j in range(9):
                 cell: Cell = self.board.get_cell(i, j)
