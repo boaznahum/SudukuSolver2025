@@ -49,7 +49,7 @@ class SudokuBoard:
         else:
             raise IndexError("Row or column index out of range.")
 
-    def set_cell_note(self, row: int, col: int, note: int | None):
+    def set_cell_note(self, row: int, col: int, note: int):
         """
             Sets the note of the cell at the given row and column.
             This clear the value of the cell.
@@ -99,7 +99,7 @@ class SudokuBoard:
         """
             Clears the note at the specified location in the cell at the given row and column.
 
-            Throws IndexError if cell or note indices are out of range \[0, 9) for cells and \[0, 3) for notes.
+            Throws IndexError if cell or note indices are out of range [0, 9) for cells and [0, 3) for notes.
 
             :param cell_row: Row index of the cell (0-8)
             :param cell_col: Column index of the cell (0-8)

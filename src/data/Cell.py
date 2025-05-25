@@ -2,11 +2,11 @@ class Cell:
     _value: int | None
 
     # represents a 3x3 grid of notes, each cell can have a note from 1 to 9
-    _notes: list[int | None]
+    _notes: list[bool]
 
     def __init__(self, value: int | None = None):
         self._value = value
-        self._notes = [None] * 9
+        self._notes = [False] * 9
 
 
     def set_value(self,  value: int | None):
@@ -21,7 +21,7 @@ class Cell:
         if value is not None and (value < 1 or value > 9):
             raise ValueError("Value must be between 1 and 9 or None.")
         self._value = value
-        self._notes = [None] * 9
+        self._notes = [False] * 9
 
     def get_value(self) -> int | None:
         """
@@ -46,7 +46,7 @@ class Cell:
         if note < 1 or note > 9:
             raise ValueError("Note must be between 1 and 9.")
         self._value = None
-        self._notes[note-1] = note
+        self._notes[note-1] = True
 
     def clear_note(self, note: int):
         """
@@ -61,7 +61,7 @@ class Cell:
         if note < 1 or note > 9:
             raise ValueError("Note must be between 1 and 9.")
         self._value = None
-        self._notes[note-1] = None
+        self._notes[note-1] = False
 
     def set_notes(self, *notes: int):
         """
@@ -73,9 +73,7 @@ class Cell:
         """
         self._value = None
         for note in notes:
-            if note < 1 or note > 9:
-                raise ValueError("Note must be between 1 and 9.")
-            self._notes[note-1] = note
+            self.set_note(note)
 
     def get_notes(self) -> list[int | None]:
         """
@@ -83,7 +81,14 @@ class Cell:
             The list contains 9 elements, each element can be None or a number between 1 and 9.
             :return:
         """
-        return self._notes
+        notes: list[int | None ] = []
+        for i in range(9):
+            if self._notes[i]:
+                notes.append(i + 1)
+            else:
+                notes.append(None)
+
+        return notes
 
     def get_note(self, i, j) -> int | None:
         """
@@ -109,7 +114,7 @@ class Cell:
         if (0 > note_row or note_row >= 3) or (0 > note_col or note_col >= 3):
             raise IndexError("Note Row or column index out of range or note out of range [0,3).")
         else:
-            self._notes[note_row * 3 + note_col] = note_row * 3 + note_col + 1
+            self.set_note(note_row * 3 + note_col + 1)  # +1 because notes are 1-indexed (1-9), not 0-indexed (0-8)
 
     def clear_note_by_loc(self, note_row: int, note_col:int):
         """
@@ -123,4 +128,4 @@ class Cell:
         if (0 > note_row or note_row >= 3) or (0 > note_col or note_col >= 3):
             raise IndexError("Note Row or column index out of range or note out of range [0,3).")
         else:
-            self._notes[note_row * 3 + note_col] = None
+            self.clear_note(note_row * 3 + note_col + 1)

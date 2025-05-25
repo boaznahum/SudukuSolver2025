@@ -31,7 +31,7 @@ class SudokuGUI:
         self.create_widgets()
 
 
-    def create_widgets(self):
+    def create_widgets(self) -> None:
         """
         Initializes and arranges all widgets for the Sudoku board GUI.
 
@@ -101,7 +101,10 @@ class SudokuGUI:
                             note_val = cell.get_note(ni, nj)
                             note = tk.Label(frame, text=str(note_val) if note_val else "", font=('Arial', 6), width=2, height=1)
                             note.grid(row=ni, column=nj, sticky="nsew")
-                            self.notes[i][j][ni][nj] = note
+
+                            notes_list: list[list[tk.Label | None]] | None = self.notes[i][j]
+                            assert notes_list is not None, "Notes grid should be initialized"
+                            notes_list[ni][nj] = note
                     for ni in range(3):
                         frame.grid_rowconfigure(ni, weight=1)
                         frame.grid_columnconfigure(ni, weight=1)
@@ -113,7 +116,7 @@ class SudokuGUI:
         ok_button = tk.Button(self.root, text="OK", command=self.on_ok)
         ok_button.grid(row=9, column=5, columnspan=4, pady=10, sticky="e")
 
-    def refresh_gui(self):
+    def refresh_gui(self) -> None:
         """
         Efficiently synchronizes the GUI with the current state of the Sudoku board.
         Only updates or recreates widgets if the cell type (value/notes) has changed.

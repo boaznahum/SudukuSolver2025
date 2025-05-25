@@ -58,7 +58,7 @@ class Solver:
             for col in range(9):
                 self._update_cell_notes(row, col)
 
-    def _update_cell_notes(self, cell_row, cell_col):
+    def _update_cell_notes(self, cell_row, cell_col) -> None:
         """
         Update the notes for the current cell.
         """
@@ -92,7 +92,7 @@ class Solver:
         else:
             print("No single note cell found, stopping the solving process.")
 
-    def _replace_single_note_cells(self):
+    def _replace_single_note_cells(self) -> bool:
         """
         Replace cells with a single note with that note.
         Return true when found one and replaced it, false otherwise.
