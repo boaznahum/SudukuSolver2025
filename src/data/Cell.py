@@ -98,7 +98,10 @@ class Cell:
             :return:
         """
         if 0 <= i < 3 and 0 <= j < 3:
-            return self._notes[i * 3 + j]
+            if self._notes[i * 3 + j]:
+                return i * 3 + j + 1
+            else:
+                return None
         else:
             raise IndexError("Row or column index out of range.")
 
