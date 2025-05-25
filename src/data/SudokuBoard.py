@@ -147,3 +147,51 @@ class SudokuBoard:
                     board_str += str(value) + " "
             board_str += "\n"
         return board_str
+
+    def get_values_in_3_areas(self, cell_row, cell_col):
+        """
+        Returns a list of values in the 3 areas (row, column, and 3x3 grid) that contain the specified cell.
+        :param cell_row: Row index of the cell (0-8)
+        :param cell_col: Column index of the cell (0-8)
+        :return: List of values in the 3 areas
+        """
+        values = set()
+
+        # Get values in the same row
+        for col in range(9):
+            value = self.get_cell_value(cell_row, col)
+            if value is not None:
+                values.add(value)
+
+        # Get values in the same column
+        for row in range(9):
+            value = self.get_cell_value(row, cell_col)
+            if value is not None:
+                values.add(value)
+
+        # Get values in the same 3x3 grid
+        start_row = (cell_row // 3) * 3
+        start_col = (cell_col // 3) * 3
+        for r in range(start_row, start_row + 3):
+            for c in range(start_col, start_col + 3):
+                value = self.get_cell_value(r, c)
+                if value is not None:
+                    values.add(value)
+
+        return list(values)
+
+    @staticmethod
+    def from_string(board_str: str) -> 'SudokuBoard':
+        """
+        Creates a SudokuBoard instance from a string representation of the board.
+        :param board_str: String representation of the board
+        :return: SudokuBoard instance
+        """
+        board = SudokuBoard()
+        rows = board_str.strip().split('\n')
+        for i, row in enumerate(rows):
+            cells = row.split()
+            for j, cell in enumerate(cells):
+                if cell != '?':
+                    board.set_cell_value(i, j, int(cell))
+        return board

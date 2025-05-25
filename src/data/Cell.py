@@ -6,7 +6,7 @@ class Cell:
 
     def __init__(self, value: int | None = None):
         self._value = value
-        self._notes = [None] * 10
+        self._notes = [None] * 9
 
 
     def set_value(self,  value: int | None):
@@ -21,7 +21,7 @@ class Cell:
         if value is not None and (value < 1 or value > 9):
             raise ValueError("Value must be between 1 and 9 or None.")
         self._value = value
-        self._notes = [None] * 10
+        self._notes = [None] * 9
 
     def get_value(self) -> int | None:
         """
@@ -31,19 +31,37 @@ class Cell:
         return self._value
 
     def set_note(self, note: int):
-        """
-            Sets the note of the cell.
-            This clear the value of the cell.
-            throws ValueError if the note is not between 1 and 9
 
-
-            :param note:
-            :return:
         """
+        Sets a note for the cell.
+
+        This method clears the cell's value and sets a note in the notes list at the index corresponding to the given note (1-9).
+        Raises a ValueError if the note is not between 1 and 9.
+
+        :param note: The note to set (must be between 1 and 9).
+        :raises ValueError: If note is not in the range 1-9.
+        :return: None
+        """
+
         if note < 1 or note > 9:
             raise ValueError("Note must be between 1 and 9.")
         self._value = None
         self._notes[note-1] = note
+
+    def clear_note(self, note: int):
+        """
+        Clears the note of the cell for the given note value.
+        This also clears the value of the cell.
+        Raises ValueError if the note is not between 1 and 9.
+
+        :param note: The note to clear (must be between 1 and 9).
+        :return: None
+        """
+
+        if note < 1 or note > 9:
+            raise ValueError("Note must be between 1 and 9.")
+        self._value = None
+        self._notes[note-1] = None
 
     def set_notes(self, *notes: int):
         """
@@ -62,6 +80,7 @@ class Cell:
     def get_notes(self) -> list[int | None]:
         """
             Returns the notes of the cell.
+            The list contains 9 elements, each element can be None or a number between 1 and 9.
             :return:
         """
         return self._notes
