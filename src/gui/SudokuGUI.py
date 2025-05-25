@@ -197,7 +197,7 @@ class SudokuGUI:
                                 cell.set_note_by_loc(ni, nj)
                             else:
                                 cell.clear_note_by_loc(ni, nj)
-                            self.board.set_cell_note(i, j, int(note_val) if note_val.isdigit() else None)
+
     def run(self) -> SudokuBoard:
         self.root.mainloop()
         return self.board
