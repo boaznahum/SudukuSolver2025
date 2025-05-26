@@ -1,15 +1,15 @@
-import enum
 from typing import Generator
 
 from data import SudokuBoard
 from data.Cell import Cell
 
 
-class State(enum.Enum):
-    IDLE = "idle"
-    NOTES = "creating_notes"
-    SOLVING = "solving"
-    SOLVED = "solved"
+# class State(enum.Enum):
+#     IDLE = "idle"
+#     NOTES = "creating_notes"
+#     REPLACE_SINGLES = "replace_singles"
+#     SOLVING = "solving"
+#     SOLVED = "solved"
 
 
 class Solver:
@@ -17,7 +17,7 @@ class Solver:
     def __init__(self, board: SudokuBoard):
         super().__init__()
         self._board: SudokuBoard = board
-        self._state: State = State.IDLE
+        # self._state: State = State.IDLE
         self._current_row: int = 0
         self._current_col: int = 0
 
@@ -30,42 +30,21 @@ class Solver:
         :return:
         """
 
-        self._state = State.IDLE
-
         # define machine state
         # if we in state IDLE, we move to state NOTES,
         # if we in state NOTES, we advance to state SOLVING
         #  when we finish we move to state SOLVED
 
+        inner_solver = self._solve()
+
         while True:
 
-            print("Solving Sudoku..., state is", self._state)
 
-            solved = False
-
-            inner_solver = None
-
-            if self._state == State.IDLE:
-                self._update_notes()
-                solved = False
-                # next step
-                self._state = State.SOLVING  # if we got a true value, we continue to the next step
-
-            elif self._state == State.SOLVING:
-                # if we are in state SOLVING, we try to solve the Sudoku
-                # if we found a single note cell, we replace it and update notes
-                # if we didn't find a single note cell, we stop the solving process
-
-                # iterate through the inner solver, yeild the value from the inner solver to the caller and get from
-                if inner_solver is None:
-                    inner_solver = self._solve()
-                    solved = next(inner_solver)
-
+            solved = next(inner_solver)
 
             do_continue = yield solved
             if solved:
                 print("Sudoku solved, moving to state SOLVED.")
-                self._state = State.SOLVED
                 return None
 
             if not do_continue:
@@ -109,15 +88,20 @@ class Solver:
 
 
         while True:
+
+            self._update_notes()
+            yield False
+
             # search for a cell with a singe not, and set the value of this cell to this note
             if self._replace_single_note_cells():
                 print("Found a single note cell and replaced it.")
                 # after replacing a single note cell, we need to update notes for all cells
-                self._update_notes()
+                # this will occur in next iteration of the generator
                 yield False
             else:
                 print("No single note cell found, stopping the solving process.")
                 yield True  # no single note cell found, we stop the solving process
+                # exit the generator
                 return
 
     def _replace_single_note_cells(self) -> bool:
