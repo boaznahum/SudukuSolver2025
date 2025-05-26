@@ -1,4 +1,8 @@
 import tkinter as tk
+from tkinter import Button, Label
+from typing import Generator
+
+from mypyc.primitives.list_ops import new_list_set_item_op
 
 from data.Cell import Cell
 from data.SudokuBoard import SudokuBoard
@@ -10,7 +14,7 @@ class SudokuGUI:
     A graphical user interface (GUI) for displaying and editing a Sudoku board.
 
     Structure:
-    - The main window displays a 9x9 Sudoku board, organized as a 3x3 grid of larger subgrids (big boards).
+    - The main window displays a 9x9 Sudoku board, organized as a 3x3 grid of larger sub grids (big boards).
     - Each big board (subgrid) is itself a 3x3 grid of cells.
     - Each cell can either:
         - Contain a value (1-9), shown as a large Entry widget for user input.
@@ -18,6 +22,13 @@ class SudokuGUI:
     - The GUI allows users to input values or notes, and provides buttons for solving the puzzle or confirming input.
     - The class maintains references to all Entry widgets and note label widgets for synchronizing the GUI with the underlying Sudoku board model.
     """
+    _solver_gen: Generator[bool, bool, None] | None
+    ok_button: Button
+    abort_button: Button
+    next_button: Button
+    solve_button: Button
+
+
     def __init__(self, board: SudokuBoard):
         self.board = board
         self.root = tk.Tk()
@@ -26,6 +37,7 @@ class SudokuGUI:
         self.notes: list[list[list[list[tk.Label | None]] | None]] = [
             [[[None for _ in range(3)] for _ in range(3)] for _ in range(9)] for _ in range(9)
         ]
+        self._solver_gen = None  # Will hold the generator
 
         self._solver = Solver(board)
         self.create_widgets()
@@ -109,12 +121,19 @@ class SudokuGUI:
                         frame.grid_rowconfigure(ni, weight=1)
                         frame.grid_columnconfigure(ni, weight=1)
 
+        self.solve_button = tk.Button(self.root, text="Solve", command=self.on_solve)
+        self.solve_button.grid(row=9, column=0, columnspan=2, pady=10, sticky="w")
 
+        # noinspection PyTypeChecker
+        self.next_button = tk.Button(self.root, text="Next", command=self.on_next, state=tk.DISABLED)
+        self.next_button.grid(row=9, column=2, columnspan=2, pady=10, sticky="w")
 
-        solve_button = tk.Button(self.root, text="Solve", command=self.on_solve)
-        solve_button.grid(row=9, column=0, columnspan=4, pady=10, sticky="w")
-        ok_button = tk.Button(self.root, text="OK", command=self.on_ok)
-        ok_button.grid(row=9, column=5, columnspan=4, pady=10, sticky="e")
+        # noinspection PyTypeChecker
+        self.abort_button = tk.Button(self.root, text="Abort", command=self.on_abort, state=tk.DISABLED)
+        self.abort_button.grid(row=9, column=4, columnspan=2, pady=10, sticky="w")
+
+        self.ok_button = tk.Button(self.root, text="OK", command=self.on_ok)
+        self.ok_button.grid(row=9, column=6, columnspan=3, pady=10, sticky="e")
 
     def refresh_gui(self) -> None:
         """
@@ -131,18 +150,19 @@ class SudokuGUI:
 
                 if cell_value:
                     # If Entry already exists, just update its value
-                    if self.entries[i][j] is not None:
-                        entry = self.entries[i][j]
+                    entry = self.entries[i][j]
+                    if entry is not None:
                         current_val = entry.get()
                         if current_val != str(cell_value):
                             entry.delete(0, tk.END)
                             entry.insert(0, str(cell_value))
                     else:
                         # Remove note widgets if present
-                        if self.notes[i][j] is not None:
+                        notes_at_i_j = self.notes[i][j]
+                        if notes_at_i_j is not None:
                             for ni in range(3):
                                 for nj in range(3):
-                                    note_label = self.notes[i][j][ni][nj]
+                                    note_label = notes_at_i_j[ni][nj]
                                     if note_label is not None:
                                         note_label.master.destroy()
                             self.notes[i][j] = None
@@ -156,27 +176,31 @@ class SudokuGUI:
                     self.notes[i][j] = None
                 else:
                     # If notes grid already exists, just update note labels
-                    if self.entries[i][j] is not None:
-                        self.entries[i][j].destroy()
+                    entry_at_i_j = self.entries[i][j]
+                    if entry_at_i_j is not None:
+                        entry_at_i_j.destroy()
                         self.entries[i][j] = None
-                    if self.notes[i][j] is not None:
+                    notes_at_i_j = self.notes[i][j]
+                    if notes_at_i_j is not None:
                         for ni in range(3):
                             for nj in range(3):
-                                note_label = self.notes[i][j][ni][nj]
+                                note_label = notes_at_i_j[ni][nj]
+                                assert note_label  # must be not None
                                 note_val = cell.get_note(ni, nj)
                                 note_label.config(text=str(note_val) if note_val else "")
                     else:
                         # Create 3x3 grid of labels for notes
                         frame = tk.Frame(parent_frame, width=40, height=40, bd=1, relief="solid")
                         frame.grid(row=i % 3, column=j % 3, padx=1, pady=1, sticky="nsew")
-                        self.notes[i][j] = [[None for _ in range(3)] for _ in range(3)]
+                        notes_at_i_j = [[None for _ in range(3)] for _ in range(3)]
+                        self.notes[i][j] = notes_at_i_j
                         for ni in range(3):
                             for nj in range(3):
                                 note_val = cell.get_note(ni, nj)
                                 note = tk.Label(frame, text=str(note_val) if note_val else "", font=('Arial', 6),
                                                 width=2, height=1)
                                 note.grid(row=ni, column=nj, sticky="nsew")
-                                self.notes[i][j][ni][nj] = note
+                                notes_at_i_j[ni][nj] = note
                         for ni in range(3):
                             frame.grid_rowconfigure(ni, weight=1)
                             frame.grid_columnconfigure(ni, weight=1)
@@ -194,11 +218,59 @@ class SudokuGUI:
     def on_solve(self):
 
         self.refresh_model()
-        # Call your solve function here, e.g. solve_sudoku(board)
-        from solver.Solver import Solver  # adjust import as needed
-        self._solver.solve()
-        # Refresh GUI with solution
+
+        self._solver = Solver(self.board)
+        self._solver_gen = self._solver.solve()
+        self._step_solver(first=True)
+
+        # self._solver.solve()
+        # # Refresh GUI with solution
+        # self.refresh_gui()
+
+    def _step_solver(self, first=False, continue_solving=True):
+        try:
+            if first:
+                result = next(self._solver_gen)
+            else:
+                result = self._solver_gen.send(continue_solving)
+        except StopIteration:
+            # noinspection PyTypeChecker
+            self.next_button.config(state=tk.DISABLED)
+            # noinspection PyTypeChecker
+            self.abort_button.config(state=tk.DISABLED)
+            # noinspection PyTypeChecker
+            self.solve_button.config(state=tk.NORMAL)
+            self.refresh_gui()
+            return
+
         self.refresh_gui()
+        if not result:
+            # noinspection PyTypeChecker
+            self.next_button.config(state=tk.NORMAL)
+            # noinspection PyTypeChecker
+            self.abort_button.config(state=tk.NORMAL)
+            # noinspection PyTypeChecker
+            self.solve_button.config(state=tk.DISABLED)
+        else:
+            # noinspection PyTypeChecker
+            self.next_button.config(state=tk.DISABLED)
+            # noinspection PyTypeChecker
+            self.abort_button.config(state=tk.DISABLED)
+            # noinspection PyTypeChecker
+            self.solve_button.config(state=tk.NORMAL)
+
+
+    def on_next(self):
+        self._step_solver(first=False, continue_solving=True)
+
+    def on_abort(self):
+        self._step_solver(first=False, continue_solving=False)
+        # noinspection PyTypeChecker
+        self.next_button.config(state=tk.DISABLED)
+        # noinspection PyTypeChecker
+        self.abort_button.config(state=tk.DISABLED)
+        # noinspection PyTypeChecker
+        self.solve_button.config(state=tk.NORMAL)
 
     def refresh_model(self):
         for i in range(9):
