@@ -1,4 +1,6 @@
 import enum
+import itertools
+from itertools import count
 from typing import Generator
 
 from data import SudokuBoard
@@ -134,63 +136,72 @@ class Solver:
                 # after replacing a single note cell, we need to update notes for all cells
                 # this will occur in next iteration of the generator
                 yield SolveResult.NOT_SOLVED_YET_CONTINUE
-            else:
+                continue
 
-                # try to solve by recursion
-                # now search for a cell with notes and try to replace it with a value
-                print("No single note cell found, trying to replace values.")
-                yield SolveResult.NOT_SOLVED_YET_CONTINUE  # no single note cell found, we stop the solving process
+            # try to solve by recursion
+            # now search for a cell with notes and try to replace it with a value
+            print("No single note cell found, trying to replace values.")
+            yield SolveResult.NOT_SOLVED_YET_CONTINUE  # no single note cell found, we stop the solving process
 
-                # search for a cell with no value but with notes
-                # if found a cell with no notes abort the process
-                for row in range(9):
-                    for col in range(9):
-                        cell: Cell = self._board.get_cell(row, col)
-                        # if the cell has a value, we skip it
-                        if cell.get_value() is not None:
-                            continue
-                        notes = cell.get_notes()
-                        if notes.count(None) == 9:
-                            print(f"Found a cell with no notes at ({row}, {col}), aborting.")
-                            yield SolveResult.NOT_SOLVED_INVALID
-                            return
+            # search for a cell with no value but with notes
+            # if found a cell with no notes abort the process
+            row_col = self._find_cell_with_minimal_number_of_notes()
+            if row_col is None:
+                print("No cell with notes found, aborting.")
+                # this is an internal error, we should not reach this point, see above
+                yield SolveResult.NOT_SOLVED_INVALID
+                return # stop the solving process, this is an error
 
-                        # if the cell has notes, we try to replace it with a value
-                        else:
-                            # we can replace this cell with a value
-                            for note in notes:
-                                if note is not None:
-                                    # set the value of the cell to this note
-                                    cell.set_value(note)
-                                    print(f"Found a note cell at ({row}, {col} ) going to put  {note}.")
-                                    # let the debugger display before replacing the cell
-                                    yield SolveResult.NOT_SOLVED_YET_CONTINUE
+            row = row_col[0]
+            col = row_col[1]
 
-                                    for now_solved in self._solve():
-                                        if now_solved == SolveResult.SOLVED:
-                                            print("Sudoku solved after replacing a note cell.")
-                                            yield SolveResult.SOLVED
-                                            return
-                                        elif now_solved == SolveResult.NOT_SOLVED_YET_CONTINUE:
-                                            yield SolveResult.NOT_SOLVED_YET_CONTINUE
-                                            # and continue next iteration
-                                        else:
-                                            assert now_solved == SolveResult.NOT_SOLVED_INVALID
+            cell: Cell = self._board.get_cell(row, col)
+            # if the cell has a value, we skip it
+            assert cell.get_value() is None
 
-                                            # break the generator
-                                            break
-                                    # not solved, restore the value and continue solving
-                                    print(f"*** Was not able to solve with {note} in cell at ({row}, {col} ), restoring")
-                                    yield SolveResult.NOT_SOLVED_YET_CONTINUE
-                                    cell.set_value(None)
-                                    self._update_notes()
+            notes = cell.get_notes()
+            if notes.count(None) == 9:
+                print(f"Found a cell with no notes at ({row}, {col}), aborting.")
+                yield SolveResult.NOT_SOLVED_INVALID
+                return # stop the solving process, this is an error
 
+            # if the cell has notes, we try to replace it with a value
+            # we can replace this cell with a value
+            for note in [ n for n in notes if n is not None ]:
 
-
-                # if we reached this point, it means that we didn't find a solution
+                # set the value of the cell to this note
+                print(f"Found a note cell at ({row}, {col} ) going to put  {note}.")
+                # let the debugger display before replacing the cell
                 yield SolveResult.NOT_SOLVED_YET_CONTINUE
-                # exit the generator
-                return
+                cell.set_value(note)
+                print(f"Set cell at ({row}, {col}) to {note} and updating notes.")
+                yield SolveResult.NOT_SOLVED_YET_CONTINUE
+
+                for now_solved in self._solve():
+                    if now_solved == SolveResult.SOLVED:
+                        print("Sudoku solved after replacing a note cell.")
+                        yield SolveResult.SOLVED
+                        return # stop the solving process, we solved the Sudoku
+                    elif now_solved == SolveResult.NOT_SOLVED_YET_CONTINUE:
+                        yield SolveResult.NOT_SOLVED_YET_CONTINUE
+                        # and continue next iteration
+                    else:
+                        assert now_solved == SolveResult.NOT_SOLVED_INVALID
+
+                        # break the generator
+                        break
+                # not solved, restore the value and continue solving
+                print(f"*** Was not able to solve with {note} in cell at ({row}, {col} ), restoring")
+                yield SolveResult.NOT_SOLVED_YET_CONTINUE
+                cell.set_value(None)
+                self._update_notes()
+
+
+
+            # if we reached this point, it means that we didn't find a solution
+            yield SolveResult.NOT_SOLVED_YET_CONTINUE
+            # exit the generator
+            return
 
     def _replace_single_note_cells(self) -> bool:
         """
@@ -215,3 +226,41 @@ class Solver:
                             # update notes for all cells
                             return True
         return False
+
+    def _find_cell_with_minimal_number_of_notes(self) -> tuple[int, int] | None:
+        """
+        Find a cell with the minimal number of notes.
+        Return the row and column of the cell.
+        If no such cell found, return (-1, -1).
+        """
+        min_notes = 10
+        min_row = 10000
+        min_col = 10000
+        found = False
+        for row in range(9):
+            for col in range(9):
+                cell: Cell = self._board.get_cell(row, col)
+                if cell.get_value() is not None:
+                    # skip cells with value
+                    continue
+
+                notes = cell.get_notes()
+                # count number of non None notes
+                number_of_notes = sum(1 for x in notes if x is not None)
+                if number_of_notes < min_notes:
+                    min_notes = number_of_notes
+                    min_row = row
+                    min_col = col
+                    found = True
+                    if min_notes == 0:
+                        # we can stop searching, we found a cell with 0 notes, which is an error
+                        return min_row, min_col
+
+        if found:
+            return min_row, min_col
+        else:
+            return None
+
+
+
+

@@ -196,7 +196,7 @@ class SudokuBoard:
         col = 0
         n = 0
         for value in values:
-            if value != '?':
+            if value.isdigit():
                 board.set_cell_value(row, col, int(value))
             col += 1
             n += 1
