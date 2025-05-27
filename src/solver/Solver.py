@@ -123,6 +123,7 @@ class Solver:
             if  update_notes_result == UpdateResult.CELL_WITH_NO_NOTES:
                 print("Found a cell with no notes, aborting.")
                 yield SolveResult.NOT_SOLVED_INVALID
+                return
             elif update_notes_result == UpdateResult.ALL_VALUES:
                 # if all cells have values, we can assume that the Sudoku is solved
                 print("All cells have notes, Sudoku is solved.")
@@ -184,22 +185,22 @@ class Solver:
                         return # stop the solving process, we solved the Sudoku
                     elif now_solved == SolveResult.NOT_SOLVED_YET_CONTINUE:
                         yield SolveResult.NOT_SOLVED_YET_CONTINUE
-                        # and continue next iteration
-                    else:
-                        assert now_solved == SolveResult.NOT_SOLVED_INVALID
+                        # and continue next iteration of the inner solver
+                        continue
 
-                        # break the generator
-                        break
+
+                    assert now_solved == SolveResult.NOT_SOLVED_INVALID
+
                 # not solved, restore the value and continue solving
                 print(f"*** Was not able to solve with {note} in cell at ({row}, {col} ), restoring")
-                yield SolveResult.NOT_SOLVED_YET_CONTINUE
+                yield SolveResult.NOT_SOLVED_INVALID
                 cell.set_value(None)
-                self._update_notes()
+                self._update_notes() # continue with next note
 
 
 
             # if we reached this point, it means that we didn't find a solution
-            yield SolveResult.NOT_SOLVED_YET_CONTINUE
+            yield SolveResult.NOT_SOLVED_INVALID
             # exit the generator
             return
 
