@@ -7,7 +7,7 @@ from data.Cell import Cell
 
 class SolveResult(enum.Enum):
      SOLVED = "solved"
-     NOT_SOLVED_CONTINUE = "not_solved_continue"
+     NOT_SOLVED_YET_CONTINUE = "not_solved_continue"
      NOT_SOLVED_INVALID = "not_solved_invalid"
 
 class UpdateResult(enum.Enum):
@@ -82,7 +82,7 @@ class Solver:
         else:
             return UpdateResult.SOME_CELLS_WITH_NOTES
 
-    def _update_cell_notes(self, cell_row, cell_col) -> int | None:
+    def _update_cell_notes(self, cell_row, cell_col) -> int :
         """
         Update the notes for the current cell.
         return the number of notes in cell
@@ -127,20 +127,19 @@ class Solver:
                 yield SolveResult.SOLVED
                 return
             else:
-                yield SolveResult.NOT_SOLVED_CONTINUE
+                yield SolveResult.NOT_SOLVED_YET_CONTINUE
 
             # search for a cell with a singe not, and set the value of this cell to this note
             if self._replace_single_note_cells():
-                print("Found a single note cell and replaced it.")
                 # after replacing a single note cell, we need to update notes for all cells
                 # this will occur in next iteration of the generator
-                yield SolveResult.NOT_SOLVED_CONTINUE
+                yield SolveResult.NOT_SOLVED_YET_CONTINUE
             else:
 
                 # try to solve by recursion
                 # now search for a cell with notes and try to replace it with a value
                 print("No single note cell found, trying to replace values.")
-                yield SolveResult.NOT_SOLVED_CONTINUE  # no single note cell found, we stop the solving process
+                yield SolveResult.NOT_SOLVED_YET_CONTINUE  # no single note cell found, we stop the solving process
 
                 # search for a cell with no value but with notes
                 # if found a cell with no notes abort the process
@@ -163,33 +162,33 @@ class Solver:
                                 if note is not None:
                                     # set the value of the cell to this note
                                     cell.set_value(note)
-                                    print(f"Found a note cell at ({row}, {col} ) putting {note}.")
+                                    print(f"Found a note cell at ({row}, {col} ) going to put  {note}.")
+                                    # let the debugger display before replacing the cell
+                                    yield SolveResult.NOT_SOLVED_YET_CONTINUE
 
                                     for now_solved in self._solve():
                                         if now_solved == SolveResult.SOLVED:
                                             print("Sudoku solved after replacing a note cell.")
                                             yield SolveResult.SOLVED
                                             return
-                                        elif now_solved == SolveResult.NOT_SOLVED_CONTINUE:
-                                            yield SolveResult.NOT_SOLVED_CONTINUE
+                                        elif now_solved == SolveResult.NOT_SOLVED_YET_CONTINUE:
+                                            yield SolveResult.NOT_SOLVED_YET_CONTINUE
                                             # and continue next iteration
                                         else:
                                             assert now_solved == SolveResult.NOT_SOLVED_INVALID
 
-                                            # restore the value and continue solving
-                                            cell.set_value(None)
                                             # break the generator
                                             break
                                     # not solved, restore the value and continue solving
                                     print(f"*** Was not able to solve with {note} in cell at ({row}, {col} ), restoring")
-                                    yield SolveResult.NOT_SOLVED_CONTINUE
+                                    yield SolveResult.NOT_SOLVED_YET_CONTINUE
                                     cell.set_value(None)
                                     self._update_notes()
 
 
 
                 # if we reached this point, it means that we didn't find a solution
-                yield SolveResult.NOT_SOLVED_CONTINUE
+                yield SolveResult.NOT_SOLVED_YET_CONTINUE
                 # exit the generator
                 return
 
@@ -212,7 +211,7 @@ class Solver:
                         if notes[note - 1] is not None:
                             # set the value of the cell to this note
                             cell.set_value(note)
-                            print(f"Found a single note cell at ({row}, {col}) with note {note}.")
+                            print(f"Found a single note cell at ({row}, {col}) with note {note} and set it as value.")
                             # update notes for all cells
                             return True
         return False

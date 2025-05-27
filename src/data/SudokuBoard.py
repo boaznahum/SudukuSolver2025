@@ -184,14 +184,29 @@ class SudokuBoard:
     def from_string(board_str: str) -> 'SudokuBoard':
         """
         Creates a SudokuBoard instance from a string representation of the board.
+
+        Read the string ignore all whitespace. on each non white space advance col and row as needed
         :param board_str: String representation of the board
         :return: SudokuBoard instance
         """
         board = SudokuBoard()
-        rows = board_str.strip().split('\n')
-        for i, row in enumerate(rows):
-            cells = row.split()
-            for j, cell in enumerate(cells):
-                if cell != '?':
-                    board.set_cell_value(i, j, int(cell))
+
+        values = board_str.strip().split()
+        row = 0
+        col = 0
+        n = 0
+        for value in values:
+            if value != '?':
+                board.set_cell_value(row, col, int(value))
+            col += 1
+            n += 1
+            if n > 9 * 9:
+                raise ValueError(f"Invalid board string: too many values. found {n}, expected 81.")
+            if col == 9:
+                col = 0
+                row += 1
+
+        if n < 9 * 9:
+            raise ValueError(f"Invalid board string: not enough values. found {n}, expected 81.")
+
         return board
