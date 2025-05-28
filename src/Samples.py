@@ -30,13 +30,25 @@ MEDIUM_1 = """
 
 #  https://sudokutodo.com/generator
 EXPERT_1 = """
-x	x	x	x	x	4	x	1	x
-x	x	7	x	x	x	x	x	3
-x	x	1	x	x	x	x	4	x
-9	x	8	x	7	x	3	x	x
-5	x	2	x	x	x	4	x	6
-x	x	6	5	x	x	x	x	x
-x	x	x	3	6	5	x	x	1
-1	x	x	x	x	x	2	x	7
-x	x	9	2	x	x	x	3	x
+    x	x	x	x	x	4	x	1	x
+    x	x	7	x	x	x	x	x	3
+    x	x	1	x	x	x	x	4	x
+    9	x	8	x	7	x	3	x	x
+    5	x	2	x	x	x	4	x	6
+    x	x	6	5	x	x	x	x	x
+    x	x	x	3	6	5	x	x	1
+    1	x	x	x	x	x	2	x	7
+    x	x	9	2	x	x	x	3	x
+"""
+
+EVIL_1 = """
+    x	x	8	x	x	x	x	5	x
+    x	x	x	5	x	x	3	x	x
+    x	3	x	x	x	x	x	x	x
+    x	x	x	8	x	x	x	7	x
+    x	8	1	x	x	x	x	x	x
+    3	x	2	x	4	7	x	6	x
+    x	x	x	x	x	1	x	3	x
+    x	9	3	x	x	x	x	x	x
+    8	1	6	3	x	5	9	x	x
 """

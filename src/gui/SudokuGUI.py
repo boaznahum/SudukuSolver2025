@@ -1,8 +1,7 @@
 import tkinter as tk
-from tkinter import Button, Label
+from tkinter import Button
 from typing import Generator
-
-from mypyc.primitives.list_ops import new_list_set_item_op
+import copy
 
 from data.Cell import Cell
 from data.SudokuBoard import SudokuBoard
@@ -27,20 +26,31 @@ class SudokuGUI:
     abort_button: Button
     next_button: Button
     solve_button: Button
+    reset_button: Button
+    debug_check:tk.Checkbutton
 
 
     def __init__(self, board: SudokuBoard):
         self.board = board
+        self._initial_board = copy.deepcopy(board)  # Store initial state
         self.root = tk.Tk()
         self.root.title("Sudoku Board Input")
         self.entries: list[list[tk.Entry | None]] = [[None for _ in range(9)] for _ in range(9)]
-        self.notes: list[list[list[list[tk.Label | None]] | None]] = [
-            [[[None for _ in range(3)] for _ in range(3)] for _ in range(9)] for _ in range(9)
+        self.notes_labels: list[list[list[list[tk.Label]] | None]] = [
+            [ None for _ in range(9)] for _ in range(9)
         ]
+
+        self._debug_var = tk.BooleanVar(value=False)
+
         self._solver_gen = None  # Will hold the generator
 
+        self._debug_mode = False  # Set to True to enable debug mode single step mode
+
+        self._solving= False  # Flag to indicate if the solver is currently running
         self._solver = Solver(board)
         self.create_widgets()
+
+
 
 
     def create_widgets(self) -> None:
@@ -101,22 +111,22 @@ class SudokuGUI:
                     e.grid(row=i % 3, column=j % 3, padx=1, pady=1, sticky="nsew")
                     e.insert(0, str(cell_value))
                     self.entries[i][j] = e
-                    self.notes[i][j] = None
+                    self.notes_labels[i][j] = None
                 else:
                     # Create a 3x3 grid of labels for notes
                     frame = tk.Frame(subgrid_frames[subgrid_row][subgrid_col], width=40, height=40, bd=1, relief="solid")
                     frame.grid(row=i % 3, column=j % 3, padx=1, pady=1, sticky="nsew")
                     self.entries[i][j] = None  # No single entry for this cell
-                    self.notes[i][j] = [[None for _ in range(3)] for _ in range(3)]
+                    labels_list = [] # we don't fill directly self._notes_labels[i][j] we can't initialize it with None due to type checker
                     for ni in range(3):
+                        label_row = []
                         for nj in range(3):
                             note_val = cell.get_note(ni, nj)
                             note = tk.Label(frame, text=str(note_val) if note_val else "", font=('Arial', 6), width=2, height=1)
                             note.grid(row=ni, column=nj, sticky="nsew")
-
-                            notes_list: list[list[tk.Label | None]] | None = self.notes[i][j]
-                            assert notes_list is not None, "Notes grid should be initialized"
-                            notes_list[ni][nj] = note
+                            label_row.append(note)
+                        labels_list.append(label_row)
+                    self.notes_labels[i][j] = labels_list
                     for ni in range(3):
                         frame.grid_rowconfigure(ni, weight=1)
                         frame.grid_columnconfigure(ni, weight=1)
@@ -134,6 +144,13 @@ class SudokuGUI:
 
         self.ok_button = tk.Button(self.root, text="OK", command=self.on_ok)
         self.ok_button.grid(row=9, column=6, columnspan=3, pady=10, sticky="e")
+
+        self.debug_check = tk.Checkbutton(self.root, text="Debug Mode", variable=self._debug_var)
+        self.debug_check.grid(row=10, column=0, columnspan=3, pady=5, sticky="w")
+
+        self.reset_button = tk.Button(self.root, text="Reset", command=self.on_reset)
+        self.reset_button.grid(row=10, column=3, columnspan=3, pady=5, sticky="e")
+        #
 
     def refresh_gui(self) -> None:
         """
@@ -158,14 +175,14 @@ class SudokuGUI:
                             entry.insert(0, str(cell_value))
                     else:
                         # Remove note widgets if present
-                        notes_at_i_j = self.notes[i][j]
+                        notes_at_i_j = self.notes_labels[i][j]
                         if notes_at_i_j is not None:
                             for ni in range(3):
                                 for nj in range(3):
                                     note_label = notes_at_i_j[ni][nj]
                                     if note_label is not None:
                                         note_label.master.destroy()
-                            self.notes[i][j] = None
+                            self.notes_labels[i][j] = None
                         # Create Entry widget
                         e = tk.Entry(parent_frame, width=4, font=('Arial', 18), justify='center',
                                      validate="key", validatecommand=(self.root.register(self.validate_input), "%P"))
@@ -173,14 +190,14 @@ class SudokuGUI:
                         e.insert(0, str(cell_value))
                         self.entries[i][j] = e
                     # Always nullify notes if Entry exists
-                    self.notes[i][j] = None
+                    self.notes_labels[i][j] = None
                 else:
                     # If notes grid already exists, just update note labels
                     entry_at_i_j = self.entries[i][j]
                     if entry_at_i_j is not None:
                         entry_at_i_j.destroy()
                         self.entries[i][j] = None
-                    notes_at_i_j = self.notes[i][j]
+                    notes_at_i_j = self.notes_labels[i][j]
                     if notes_at_i_j is not None:
                         all_none = True
                         for ni in range(3):
@@ -195,7 +212,7 @@ class SudokuGUI:
                         for ni in range(3):
                             for nj in range(3):
                                 note_label = notes_at_i_j[ni][nj]
-                                if all_none:
+                                if all_none and self._solving:
                                     note_label.config(bg="red")
                                 else:
                                     note_label.config(bg="SystemButtonFace")
@@ -203,10 +220,10 @@ class SudokuGUI:
                         # Create 3x3 grid of labels for notes
                         frame = tk.Frame(parent_frame, width=40, height=40, bd=1, relief="solid")
                         frame.grid(row=i % 3, column=j % 3, padx=1, pady=1, sticky="nsew")
-                        notes_at_i_j = [[None for _ in range(3)] for _ in range(3)]
-                        self.notes[i][j] = notes_at_i_j
+                        notes_at_i_j = []
                         all_none = True
                         for ni in range(3):
+                            notes_row = []
                             for nj in range(3):
                                 note_val = cell.get_note(ni, nj)
                                 note = tk.Label(frame, text=str(note_val) if note_val else "", font=('Arial', 6),
@@ -214,12 +231,14 @@ class SudokuGUI:
                                 note.grid(row=ni, column=nj, sticky="nsew")
                                 if note_val:
                                     all_none = False
-                                notes_at_i_j[ni][nj] = note
+                                notes_row.append(note)
+                            notes_at_i_j.append(notes_row)
+                        self.notes_labels[i][j] = notes_at_i_j
                         # Set background color based on notes
                         for ni in range(3):
                             for nj in range(3):
-                                note_label: tk.Label = notes_at_i_j[ni][nj]
-                                if all_none:
+                                note_label = notes_at_i_j[ni][nj]
+                                if all_none and self._solving:
                                     note_label.config(bg="red")
                                 else:
                                     note_label.config(bg="SystemButtonFace")
@@ -246,9 +265,26 @@ class SudokuGUI:
         self._solver_gen = self._solver.solve()
         self._step_solver(first=True)
 
-        # self._solver.solve()
-        # # Refresh GUI with solution
-        # self.refresh_gui()
+        self._solving = True
+
+        if not self._debug_var.get():
+            # If not in debug mode, automatically solve the puzzle
+            # This will run the solver until it finishes or is aborted
+
+            self._auto_solve_step()
+
+    def _auto_solve_step(self):
+        try:
+            self._step_solver(first=False, continue_solving=True)
+            self.refresh_gui()
+            # Schedule the next step after a short delay (e.g., 10 ms)
+            # noinspection PyTypeChecker
+            self.root.after(10, self._auto_solve_step)
+        except StopIteration:
+            self._exit_solving_mode()
+
+
+
 
     def _step_solver(self, first=False, continue_solving=True):
         try:
@@ -258,11 +294,7 @@ class SudokuGUI:
                 result = self._solver_gen.send(continue_solving)
         except StopIteration:
             # noinspection PyTypeChecker
-            self.next_button.config(state=tk.DISABLED)
-            # noinspection PyTypeChecker
-            self.abort_button.config(state=tk.DISABLED)
-            # noinspection PyTypeChecker
-            self.solve_button.config(state=tk.NORMAL)
+            self._exit_solving_mode()
             self.refresh_gui()
             return
 
@@ -274,26 +306,44 @@ class SudokuGUI:
             self.abort_button.config(state=tk.NORMAL)
             # noinspection PyTypeChecker
             self.solve_button.config(state=tk.DISABLED)
+            # noinspection PyTypeChecker
+            self.solve_button.config(state=tk.DISABLED)
         else:
             # noinspection PyTypeChecker
-            self.next_button.config(state=tk.DISABLED)
-            # noinspection PyTypeChecker
-            self.abort_button.config(state=tk.DISABLED)
-            # noinspection PyTypeChecker
-            self.solve_button.config(state=tk.NORMAL)
-
+            self._exit_solving_mode()
 
     def on_next(self):
-        self._step_solver(first=False, continue_solving=True)
+        if not  self._debug_var.get():  # switch back to auto-solve mode
+            # In debug mode, step through the solver
+            self._auto_solve_step()
+        else:
+            self._step_solver(first=False, continue_solving=True)
 
     def on_abort(self):
         self._step_solver(first=False, continue_solving=False)
+        # noinspection PyTypeChecker
+        self._exit_solving_mode()
+
+    def _exit_solving_mode(self):
+        """
+        Enable solve and disable next and abort buttons.
+        :return:
+        """
         # noinspection PyTypeChecker
         self.next_button.config(state=tk.DISABLED)
         # noinspection PyTypeChecker
         self.abort_button.config(state=tk.DISABLED)
         # noinspection PyTypeChecker
+        self.reset_button.config(state=tk.NORMAL)
+        # noinspection PyTypeChecker
         self.solve_button.config(state=tk.NORMAL)
+
+        self._solving = False  # Reset solving flag
+
+    def on_reset(self):
+        self.board = copy.deepcopy(self._initial_board)
+        self.refresh_gui()
+        self._exit_solving_mode()
 
     def refresh_model(self):
         for i in range(9):
@@ -302,10 +352,10 @@ class SudokuGUI:
                 if self.entries[i][j] is not None:
                     val = self.entries[i][j].get()
                     cell.set_value(int(val) if val.isdigit() and 1 <= int(val) <= 9 else None)
-                elif self.notes[i][j] is not None:
+                elif self.notes_labels[i][j] is not None:
                     for ni in range(3):
                         for nj in range(3):
-                            note_label = self.notes[i][j][ni][nj]
+                            note_label = self.notes_labels[i][j][ni][nj]
                             note_val = note_label.cget("text") if note_label else ""
                             if note_val.isdigit():
                                 cell.set_note_by_loc(ni, nj)

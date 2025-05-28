@@ -6,7 +6,8 @@ if __name__ == '__main__':
     from data.SudokuBoard import SudokuBoard
 
     #fill the board with numbers
-    board = SudokuBoard.from_string(Samples.EXPERT_1)
+    # board = SudokuBoard.from_string(Samples.EXPERT_1)
+    board = SudokuBoard.from_string(Samples.EVIL_1)
 
 
     gui = SudokuGUI(board)
