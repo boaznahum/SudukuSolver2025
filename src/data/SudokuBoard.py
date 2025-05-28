@@ -210,3 +210,16 @@ class SudokuBoard:
             raise ValueError(f"Invalid board string: not enough values. found {n}, expected 81.")
 
         return board
+
+    def copy_values_from(self, target: "SudokuBoard") -> None:
+        """
+        Copies the values from another SudokuBoard instance to this instance.
+        Notes are not copied, only the values.
+        :param target: The SudokuBoard instance to copy values from
+        :return: None
+        """
+        for row in range(9):
+            for col in range(9):
+                value = target.get_cell_value(row, col)
+                self.set_cell_value(row, col, value)
+

@@ -182,25 +182,48 @@ class SudokuGUI:
                         self.entries[i][j] = None
                     notes_at_i_j = self.notes[i][j]
                     if notes_at_i_j is not None:
+                        all_none = True
                         for ni in range(3):
                             for nj in range(3):
                                 note_label = notes_at_i_j[ni][nj]
                                 assert note_label  # must be not None
                                 note_val = cell.get_note(ni, nj)
                                 note_label.config(text=str(note_val) if note_val else "")
+                                if note_val:
+                                    all_none = False
+                        # if all notes are None, set background to red
+                        for ni in range(3):
+                            for nj in range(3):
+                                note_label = notes_at_i_j[ni][nj]
+                                if all_none:
+                                    note_label.config(bg="red")
+                                else:
+                                    note_label.config(bg="SystemButtonFace")
                     else:
                         # Create 3x3 grid of labels for notes
                         frame = tk.Frame(parent_frame, width=40, height=40, bd=1, relief="solid")
                         frame.grid(row=i % 3, column=j % 3, padx=1, pady=1, sticky="nsew")
                         notes_at_i_j = [[None for _ in range(3)] for _ in range(3)]
                         self.notes[i][j] = notes_at_i_j
+                        all_none = True
                         for ni in range(3):
                             for nj in range(3):
                                 note_val = cell.get_note(ni, nj)
                                 note = tk.Label(frame, text=str(note_val) if note_val else "", font=('Arial', 6),
                                                 width=2, height=1)
                                 note.grid(row=ni, column=nj, sticky="nsew")
+                                if note_val:
+                                    all_none = False
                                 notes_at_i_j[ni][nj] = note
+                        # Set background color based on notes
+                        for ni in range(3):
+                            for nj in range(3):
+                                note_label: tk.Label = notes_at_i_j[ni][nj]
+                                if all_none:
+                                    note_label.config(bg="red")
+                                else:
+                                    note_label.config(bg="SystemButtonFace")
+
                         for ni in range(3):
                             frame.grid_rowconfigure(ni, weight=1)
                             frame.grid_columnconfigure(ni, weight=1)

@@ -1,6 +1,4 @@
 import enum
-import itertools
-from itertools import count
 from typing import Generator
 
 from data import SudokuBoard
@@ -27,6 +25,34 @@ class Solver:
         self._current_row: int = 0
         self._current_col: int = 0
 
+        self._recursive_stack: list[tuple[int, int, int]] = []  # stack to keep track of the cells we are solving
+
+
+    def _debug(self, *args, **kwargs):
+
+        # create privix from the rursive stack
+        # each element appears as (r:int, c:int, v:int)
+        prefix = " ".join(f"({r},{c},{v})" for r, c, v in self._recursive_stack)
+        print(prefix, ":", *args, **kwargs)
+
+    def _push_recursive_stack(self, row: int, col: int, value: int):
+        """
+        Push the current cell to the recursive stack.
+        :param row: The row of the cell.
+        :param col: The column of the cell.
+        :param value: The value of the cell.
+        """
+        self._recursive_stack.append((row, col, value))
+
+    def _pop_recursive_stack(self) -> tuple[int, int, int]:
+        """
+        Pop the last cell from the recursive stack.
+        :return: The row, column and value of the cell.
+        """
+        if not self._recursive_stack:
+            raise IndexError("Recursive stack is empty.")
+        return self._recursive_stack.pop()
+
     def solve(self) -> Generator[bool, bool, None]:
         """
         This is iterator generator that solves the Sudoku puzzle step by step.
@@ -51,15 +77,15 @@ class Solver:
 
             do_continue = yield solved
             if solved:
-                print("Sudoku solved, Done.")
+                self._debug("Sudoku solved, Done.")
                 return None
 
             if solved_status == SolveResult.NOT_SOLVED_INVALID:
-                print("Sudoku is not solvable, Done.")
+                self._debug("Sudoku is not solvable, Done.")
                 return None
 
             if not do_continue:
-                print("Stopping the solving process.")
+                self._debug("Stopping the solving process.")
                 return None
 
     def _update_notes(self) -> UpdateResult:
@@ -67,7 +93,7 @@ class Solver:
         Update notes for all cells in the Sudoku board.
         return the number of cells that have no value and where notes were updated.
         """
-        print("Updating notes for all cells.")
+        self._debug("Updating notes for all cells.")
         number_of_cells_with_notes: int = 0
         for row in range(9):
             for col in range(9):
@@ -114,19 +140,25 @@ class Solver:
         return number_of_notes
 
     def _solve(self) -> Generator[SolveResult, None, None] :
-        print("Actually Solving Sudoku...")
+        self._debug("Actually Solving Sudoku...")
 
+        # This method modify the board, so in case of recursive calls when it was not able to solve the Sudoku,
+        # we need to restore the board to the previous state.
+
+        saved_board = SudokuBoard()
+        # we need to copy values only, because notes are updated on each iteration
+        saved_board.copy_values_from(self._board)
 
         while True:
 
             update_notes_result = self._update_notes()
             if  update_notes_result == UpdateResult.CELL_WITH_NO_NOTES:
-                print("Found a cell with no notes, aborting.")
+                self._debug("Found a cell with no notes, aborting.")
                 yield SolveResult.NOT_SOLVED_INVALID
                 return
             elif update_notes_result == UpdateResult.ALL_VALUES:
                 # if all cells have values, we can assume that the Sudoku is solved
-                print("All cells have notes, Sudoku is solved.")
+                self._debug("All cells have notes, Sudoku is solved.")
                 yield SolveResult.SOLVED
                 return
             else:
@@ -141,14 +173,14 @@ class Solver:
 
             # try to solve by recursion
             # now search for a cell with notes and try to replace it with a value
-            print("No single note cell found, trying to replace values.")
+            self._debug("No single note cell found, trying to replace values.")
             yield SolveResult.NOT_SOLVED_YET_CONTINUE  # no single note cell found, we stop the solving process
 
             # search for a cell with no value but with notes
             # if found a cell with no notes abort the process
             row_col = self._find_cell_with_minimal_number_of_notes()
             if row_col is None:
-                print("No cell with notes found, aborting.")
+                self._debug("No cell with notes found, aborting.")
                 # this is an internal error, we should not reach this point, see above
                 yield SolveResult.NOT_SOLVED_INVALID
                 return # stop the solving process, this is an error
@@ -162,7 +194,7 @@ class Solver:
 
             notes = cell.get_notes()
             if notes.count(None) == 9:
-                print(f"Found a cell with no notes at ({row}, {col}), aborting.")
+                self._debug(f"Found a cell with no notes at ({row}, {col}), aborting.")
                 yield SolveResult.NOT_SOLVED_INVALID
                 return # stop the solving process, this is an error
 
@@ -171,16 +203,17 @@ class Solver:
             for note in [ n for n in notes if n is not None ]:
 
                 # set the value of the cell to this note
-                print(f"Found a note cell at ({row}, {col} ) going to put  {note}.")
+                self._debug(f"Found a note cell at ({row}, {col} ) going to put  {note}.")
                 # let the debugger display before replacing the cell
                 yield SolveResult.NOT_SOLVED_YET_CONTINUE
                 cell.set_value(note)
-                print(f"Set cell at ({row}, {col}) to {note} and updating notes.")
+                self._push_recursive_stack(row, col, note)
+                self._debug(f"Set cell at ({row}, {col}) to {note} and updating notes.")
                 yield SolveResult.NOT_SOLVED_YET_CONTINUE
 
                 for now_solved in self._solve():
                     if now_solved == SolveResult.SOLVED:
-                        print("Sudoku solved after replacing a note cell.")
+                        self._debug("Sudoku solved after replacing a note cell.")
                         yield SolveResult.SOLVED
                         return # stop the solving process, we solved the Sudoku
                     elif now_solved == SolveResult.NOT_SOLVED_YET_CONTINUE:
@@ -191,15 +224,21 @@ class Solver:
 
                     assert now_solved == SolveResult.NOT_SOLVED_INVALID
 
-                # not solved, restore the value and continue solving
-                print(f"*** Was not able to solve with {note} in cell at ({row}, {col} ), restoring")
-                yield SolveResult.NOT_SOLVED_INVALID
+                # not solved, restore the value and continue trying with the next note
+                self._debug(f"*** Was not able to solve with {note} in cell at ({row}, {col} ), restoring")
+                yield SolveResult.NOT_SOLVED_YET_CONTINUE # just let debugger display before restoring the cell
                 cell.set_value(None)
+                self._pop_recursive_stack()
                 self._update_notes() # continue with next note
 
 
 
             # if we reached this point, it means that we didn't find a solution
+            self._debug("No solution found, restoring the board to the previous state.")
+            yield SolveResult.NOT_SOLVED_INVALID
+            self._board.copy_values_from(saved_board)
+            self._update_notes()
+            self._debug("No solution found, state restored")
             yield SolveResult.NOT_SOLVED_INVALID
             # exit the generator
             return
@@ -223,7 +262,7 @@ class Solver:
                         if notes[note - 1] is not None:
                             # set the value of the cell to this note
                             cell.set_value(note)
-                            print(f"Found a single note cell at ({row}, {col}) with note {note} and set it as value.")
+                            self._debug(f"Found a single note cell at ({row}, {col}) with note {note} and set it as value.")
                             # update notes for all cells
                             return True
         return False
